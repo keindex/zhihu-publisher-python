@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zhihu-publisher"
+version = "0.1.0"
+description = "Python CLI for rendering and publishing Markdown to Zhihu"
+requires-python = ">=3.10"
+dependencies = [
+    "markdown-it-py",
+    "mdit-py-plugins",
+    "emoji>=2.0",
+    "PyYAML",
+    "httpx",
+    "oss2",
+    "platformdirs",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "build"]
+
+[project.scripts]
+zhihupost = "zhihupost.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["zhihupost*"]

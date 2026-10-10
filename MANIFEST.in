@@ -1,0 +1,2 @@
+include README.en.md
+recursive-include test/fixtures/publishTest *.md *.html
