@@ -22,6 +22,19 @@ from .publisher import Publisher, PublishResult
 
 _KNOWN_COOKIE: str | None = None
 
+# ANSI color codes for terminal output
+_GREEN = "\033[32m"
+_RED = "\033[31m"
+_RESET = "\033[0m"
+
+
+def _green(text: str) -> str:
+    return f"{_GREEN}{text}{_RESET}"
+
+
+def _red(text: str) -> str:
+    return f"{_RED}{text}{_RESET}"
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="zhihupost")
@@ -170,9 +183,10 @@ def _read_text(path: Path) -> str:
 
 
 def _print_result(result: PublishResult) -> None:
-    detail = f": {result.url}" if result.url else ""
+    detail = f": {_green(result.url)}" if result.url else ""
     title = f" ({result.title})" if result.title else ""
-    print(f"{result.status}{title}{detail}")
+    status = _green(result.status) if result.status in ("published", "draft") else result.status
+    print(f"{status}{title}{detail}")
 
 
 def _print_summary(summary: BatchSummary) -> None:
@@ -180,7 +194,7 @@ def _print_summary(summary: BatchSummary) -> None:
     print(f"skipped: {summary.skipped}")
     print(f"failed: {summary.failed}")
     for path, message in summary.failures:
-        print(f"failed: {path}: {_safe_error(message)}")
+        print(f"failed: {path}: {_red(_safe_error(message))}")
 
 
 def _profile_text(profile: Any) -> str:
