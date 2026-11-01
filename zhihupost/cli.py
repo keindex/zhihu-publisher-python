@@ -1,4 +1,4 @@
-"""Command-line interface for local rendering and Zhihu publishing."""
+"""Command-line interface for Markdown rendering and Zhihu content management."""
 
 from __future__ import annotations
 
@@ -11,9 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from .auth import parse_cookie_header, resolve_cookie, validate_cookie
-from .batch import BatchSummary, publish_directory
+from .batch import BatchSummary, delete_directory, publish_directory
 from .client import ZhihuClient
 from .config import CookieError, CookieStore
+from .deleter import Deleter, DeleteResult
 from .document import parse_document
 from .images import ImageUploader
 from .markdown import render_markdown
@@ -58,6 +59,15 @@ def build_parser() -> argparse.ArgumentParser:
     publish_dir.add_argument("--draft", action="store_true")
     publish_dir.add_argument("--delay", type=float, default=60.0, metavar="SECONDS")
 
+    delete = commands.add_parser("delete", help="Delete an article by ID, URL, or Markdown file")
+    delete.add_argument("article")
+    delete.add_argument("--dry-run", action="store_true", help="Preview without deleting or changing files")
+
+    delete_dir = commands.add_parser("delete-dir", help="Delete articles linked from Markdown files")
+    delete_dir.add_argument("dir")
+    delete_dir.add_argument("--delay", type=float, default=1.5, metavar="SECONDS")
+    delete_dir.add_argument("--dry-run", action="store_true", help="Preview without deleting or changing files")
+
     upload_image = commands.add_parser("upload-image", help="Upload an image file")
     upload_image.add_argument("file")
     return parser
@@ -80,6 +90,10 @@ def main(argv: list[str] | None = None) -> int:
             return _publish(Path(args.file), draft=args.draft, dry_run=args.dry_run)
         if args.command == "publish-dir":
             return _publish_dir(Path(args.dir), draft=args.draft, delay=args.delay)
+        if args.command == "delete":
+            return _delete(args.article, dry_run=args.dry_run)
+        if args.command == "delete-dir":
+            return _delete_dir(Path(args.dir), dry_run=args.dry_run, delay=args.delay)
         if args.command == "upload-image":
             return _upload_image(Path(args.file))
         raise ValueError(f"Unsupported command: {args.command}")
@@ -161,6 +175,45 @@ def _upload_image(path: Path) -> int:
         client.close()
 
 
+def _delete(article: str, *, dry_run: bool) -> int:
+    client = None if dry_run else _client_from_store()
+    try:
+        deleter = Deleter(client)
+        if "://" in article or (article.isascii() and article.isdecimal()):
+            result = deleter.delete_article(article, dry_run=dry_run)
+        else:
+            result = deleter.delete_file(Path(article), dry_run=dry_run)
+        _print_delete_result(result)
+        return 0
+    finally:
+        if client is not None:
+            client.close()
+
+
+def _delete_dir(path: Path, *, dry_run: bool, delay: float) -> int:
+    client = None if dry_run else _client_from_store()
+    try:
+        summary = delete_directory(
+            path,
+            Deleter(client),
+            dry_run=dry_run,
+            delay=delay,
+            on_result=lambda source, result: _print_delete_result(result, source),
+        )
+        _print_summary(summary, succeeded_label="would-delete" if dry_run else "succeeded")
+        return 1 if summary.failed else 0
+    finally:
+        if client is not None:
+            client.close()
+
+
+def _print_delete_result(result: DeleteResult, path: Path | None = None) -> None:
+    status = _green(result.status) if result.status in {"deleted", "already-deleted"} else result.status
+    source = f" ({path})" if path is not None else ""
+    detail = f": {result.url}" if result.url else ""
+    print(f"{status}{source}{detail}")
+
+
 def _publisher_from_store():
     client = _client_from_store()
     try:
@@ -189,8 +242,8 @@ def _print_result(result: PublishResult) -> None:
     print(f"{status}{title}{detail}")
 
 
-def _print_summary(summary: BatchSummary) -> None:
-    print(f"succeeded: {summary.succeeded}")
+def _print_summary(summary: BatchSummary, *, succeeded_label: str = "succeeded") -> None:
+    print(f"{succeeded_label}: {summary.succeeded}")
     print(f"skipped: {summary.skipped}")
     print(f"failed: {summary.failed}")
     for path, message in summary.failures:

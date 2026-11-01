@@ -240,3 +240,62 @@ def set_front_matter_value(text: str, key: str, value: str) -> str:
         f"{bom}{source[: front_matter.closing_start]}{insertion}"
         f"{source[front_matter.closing_start:]}"
     )
+
+
+def remove_front_matter_value(text: str, key: str) -> str:
+    """Remove a top-level field while retaining the body and other metadata."""
+    _field_pattern(key)
+    bom = "\ufeff" if text.startswith("\ufeff") else ""
+    source = text[len(bom) :]
+    front_matter = _front_matter(source)
+    if front_matter is None:
+        return text
+
+    region = source[front_matter.opening_end : front_matter.closing_start]
+    try:
+        metadata = yaml.safe_load(region)
+        node = yaml.compose(region)
+    except yaml.YAMLError:
+        raise ValueError("Invalid YAML front matter.") from None
+    if metadata is None:
+        return text
+    if not isinstance(metadata, dict) or not isinstance(node, yaml.MappingNode):
+        raise ValueError("YAML front matter must be a mapping with string keys.")
+    if key not in metadata:
+        return text
+
+    spans = []
+    if not node.flow_style:
+        for key_node, value_node in node.value:
+            if key_node.value != key:
+                continue
+            start = key_node.start_mark.index
+            while start > 0 and region[start - 1] not in "\r\n":
+                start -= 1
+            end = max(key_node.end_mark.index, value_node.end_mark.index)
+            if end == 0 or region[end - 1] not in "\r\n":
+                while end < len(region) and region[end] not in "\r\n":
+                    end += 1
+                if region[end : end + 2] == "\r\n":
+                    end += 2
+                elif end < len(region):
+                    end += 1
+            spans.append((start, end))
+
+    updated = region
+    for start, end in sorted(spans, reverse=True):
+        updated = updated[:start] + updated[end:]
+    expected = {name: value for name, value in metadata.items() if name != key}
+    try:
+        preserved = (yaml.safe_load(updated) or {}) == expected
+    except yaml.YAMLError:
+        preserved = False
+    if not spans or not preserved:
+        raise ValueError(
+            f"Cannot remove front matter '{key}' without changing other metadata; "
+            "use a separate top-level field without shared YAML anchors or merges"
+        )
+    return (
+        f"{bom}{source[: front_matter.opening_end]}{updated}"
+        f"{source[front_matter.closing_start:]}"
+    )

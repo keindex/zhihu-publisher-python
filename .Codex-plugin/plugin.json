@@ -1,0 +1,9 @@
+{
+  "name": "zhihu-publisher",
+  "version": "0.2.0",
+  "description": "Publish, preview, and delete Zhihu articles using the zhihupost CLI.",
+  "license": "MIT",
+  "skills": [
+    "./skills/productivity/zhihu-publisher"
+  ]
+}

@@ -19,6 +19,8 @@ def test_parser_registers_supported_commands():
         "render",
         "publish",
         "publish-dir",
+        "delete",
+        "delete-dir",
         "upload-image",
     }
 

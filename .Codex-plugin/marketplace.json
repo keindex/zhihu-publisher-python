@@ -1,0 +1,13 @@
+{
+  "name": "zhihu-publisher-local",
+  "owner": {
+    "name": "zhihu-publisher maintainers"
+  },
+  "plugins": [
+    {
+      "name": "zhihu-publisher",
+      "source": "./",
+      "description": "Publish, preview, and delete Zhihu articles using the zhihupost CLI."
+    }
+  ]
+}

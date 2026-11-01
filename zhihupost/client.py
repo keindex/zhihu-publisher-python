@@ -19,6 +19,10 @@ _USER_AGENT = (
 class ZhihuAPIError(RuntimeError):
     """A sanitized transport or API failure."""
 
+    def __init__(self, message: str, *, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
+
 
 class ZhihuClient:
     def __init__(
@@ -113,7 +117,8 @@ class ZhihuClient:
 
         if not 200 <= response.status_code < 300:
             raise ZhihuAPIError(
-                f"Zhihu API returned HTTP {response.status_code} for {current_method}"
+                f"Zhihu API returned HTTP {response.status_code} for {current_method}",
+                status_code=response.status_code,
             )
         return response
 
